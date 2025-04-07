@@ -1,0 +1,10 @@
+[package]
+name = "sui_walrus_blog"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui", subdir = "crates/sui-framework/packages/sui-framework", rev = "testnet" }
+
+[addresses]
+sui_walrus_blog = "0x0"
