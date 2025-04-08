@@ -4,7 +4,7 @@ export const BLOG_MODULE = 'blog'
 export const BLOG_POST_TYPE = `${BLOG_PACKAGE_ID}::${BLOG_MODULE}::Post`
 
 // API 配置
-export const WALRUS_API_URL = 'http://walrus-testnet.equinoxdao.xyz:9000/' 
-
+export const AGGREGATOR_URL = 'https://aggregator.walrus-testnet.walrus.space'
+export const PUBLISHER_URL = 'https://walrus-publisher-testnet.equinoxdao.xyz'
 export const rpc_url = "https://mysten-rpc.testnet.sui.io:443"  
 export const ws_rpc_url = "wss://mysten-rpc.testnet.sui.io:443"  

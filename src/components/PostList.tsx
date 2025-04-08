@@ -11,7 +11,7 @@ import {
   Alert
 } from '@mui/material'
 import { Link } from 'react-router-dom'
-import { WALRUS_API_URL,BLOG_PACKAGE_ID } from '../constants'
+import { PUBLISHER_URL,BLOG_PACKAGE_ID } from '../constants'
 
 interface Post {
   id: string
@@ -44,7 +44,7 @@ export function PostList() {
 
   const fetchContent = async (hash: string): Promise<string> => {
     try {
-      const response = await fetch(`${WALRUS_API_URL}/v1/blob/${hash}`)
+      const response = await fetch(`${PUBLISHER_URL}/v1/blob/${hash}`)
       if (!response.ok) {
         throw new Error('Failed to fetch content from Walrus')
       }

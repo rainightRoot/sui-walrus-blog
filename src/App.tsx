@@ -80,6 +80,11 @@ const StyledConnectButton = styled(ConnectButton)(({ theme }) => ({
 
 function App() {
   return (
+    <div style={{
+      backgroundColor: '#fff',
+      width: '100vw',
+      height: '100vh',
+    }}>
     <QueryClientProvider client={queryClient}>
       <SuiClientProvider
         networks={{
@@ -135,7 +140,7 @@ function App() {
                   </Toolbar>
                 </AppBar>
 
-                <Container maxWidth="lg" sx={{ mt: 4 }}>
+                <Container maxWidth="xl" sx={{ mt: 4, maxWidth: '1200px' }}>
                   <Routes>
                     <Route path="/" element={<PostList />} />
                     <Route path="/create" element={<CreatePost />} />
@@ -147,6 +152,7 @@ function App() {
         </WalletProvider>
       </SuiClientProvider>
     </QueryClientProvider>
+    </div>
   )
 }
 

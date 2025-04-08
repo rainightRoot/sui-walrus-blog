@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <title>Walrus 图片上传与回显 Demo</title>
+</head>
+<body>
+  <h2>📤 上传图片并在下方预览：</h2>
+
+  <input type="file" id="fileInput" accept="image/*" />
+  <button onclick="upload()">上传</button>
+
+  <p id="status"></p>
+
+  <h3>🖼️ 图片预览：</h3>
+  <img id="preview" style="max-width: 400px; border: 1px solid #ccc;" />
+
+  <script>
+    const PUBLISHER = 'https://walrus-publisher-testnet.equinoxdao.xyz';
+    const AGGREGATOR = 'https://aggregator.walrus-testnet.walrus.space';
+
+    const RECEIVER_ADDRESS = '0x6c9b67c2290f3a9b3d7d1abdc9d1eaaa6df7c9fd3ff45675cf22893a1f294ce9'; // 你的钱包地址
+    const EPOCHS = 5;
+
+    async function upload() {
+      const fileInput = document.getElementById('fileInput');
+      const status = document.getElementById('status');
+      const preview = document.getElementById('preview');
+
+      if (!fileInput.files.length) {
+        alert('请选择图片');
+        return;
+      }
+
+      const file = fileInput.files[0];
+      status.innerText = '上传中...';
+
+      const url = `${PUBLISHER}/v1/blobs?epochs=${EPOCHS}&send_object_to=${RECEIVER_ADDRESS}`;
+
+      try {
+        const res = await fetch(url, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type || 'application/octet-stream',
+          },
+          body: file
+        });
+
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+
+        const ress = (await res.json());
+        console.log('上传成功，res:', ress);
+        const blobId = ress.alreadyCertified.blobId;
+        console.log('上传成功，blobId:', blobId);
+
+        status.innerText = `上传成功！blobId: ${blobId}`;
+
+        // 显示图片
+        preview.src = `${AGGREGATOR}/v1/blobs/${blobId}`;
+      } catch (err) {
+        console.error(err);
+        status.innerText = '上传失败：' + err.message;
+      }
+    }
+  </script>
+</body>
+</html>

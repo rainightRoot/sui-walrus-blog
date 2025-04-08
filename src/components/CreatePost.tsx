@@ -16,13 +16,13 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextareaAutosize
 } from '@mui/material'
 import { Add as AddIcon, Delete as DeleteIcon, Image as ImageIcon } from '@mui/icons-material'
 import { styled } from '@mui/material/styles'
 import { TransactionBlock } from '@mysten/sui.js/transactions'
-import { BLOG_PACKAGE_ID, BLOG_MODULE, WALRUS_API_URL } from '../constants'
+import { BLOG_PACKAGE_ID, BLOG_MODULE, PUBLISHER_URL, AGGREGATOR_URL } from '../constants'
 import { Asset } from '../types'
+import { MarkdownEditor } from './MarkdownEditor'
 
 // 自定义样式
 const StyledPaper = styled(Paper)(({ theme }) => ({
@@ -33,22 +33,6 @@ const StyledPaper = styled(Paper)(({ theme }) => ({
   boxShadow: theme.shadows[1],
   '&:hover': {
     boxShadow: theme.shadows[3],
-  },
-}))
-
-const StyledTextarea = styled(TextareaAutosize)(({ theme }) => ({
-  width: '100%',
-  padding: theme.spacing(2),
-  border: `1px solid ${theme.palette.divider}`,
-  borderRadius: theme.shape.borderRadius,
-  fontFamily: 'monospace',
-  fontSize: '14px',
-  lineHeight: 1.5,
-  resize: 'vertical',
-  minHeight: '300px',
-  '&:focus': {
-    outline: 'none',
-    borderColor: theme.palette.primary.main,
   },
 }))
 
@@ -93,27 +77,6 @@ export function CreatePost() {
     localStorage.setItem('blogPostDraft', JSON.stringify(draft))
   }, [title, content, tags])
 
-  // 处理图片粘贴
-  const handlePaste = useCallback(async (event: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const items = event.clipboardData?.items
-    if (!items) return
-
-    for (const item of items) {
-      if (item.type.startsWith('image/')) {
-        event.preventDefault()
-        const file = item.getAsFile()
-        if (file) {
-          const preview = URL.createObjectURL(file)
-          setAssets(prev => [...prev, {
-            file,
-            preview,
-            uploadStatus: 'pending'
-          }])
-        }
-      }
-    }
-  }, [])
-
   // 添加图片上传按钮
   const handleImageUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -144,20 +107,30 @@ export function CreatePost() {
   // 上传图片到 Walrus
   const uploadToWalrus = async (file: File): Promise<string> => {
     try {
-      const formData = new FormData()
-      formData.append('file', file)
+      console.log(file,'file')
+      const address = '0x6c9b67c2290f3a9b3d7d1abdc9d1eaaa6df7c9fd3ff45675cf22893a1f294ce9';
+      const epochs = 5;
+      const url = `${PUBLISHER_URL}/v1/blobs?send_object_to=${address}&epochs=${epochs}&deletable=true`;
+      
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+        body: file,
+      });
+      
+      if (res.ok) {
+        const ress = (await res.json());
+        console.log('上传成功，res:', ress);
+        const blobId = ress.newlyCreated?.blobObject?.blobId|| ress.alreadyCertified?.blobId;
+        console.log('上传成功，blobId:', blobId);
 
-      const response = await fetch(`${WALRUS_API_URL}/upload`, {
-        method: 'POST',
-        body: formData,
-      })
-
-      if (!response.ok) {
+        return `${AGGREGATOR_URL}/v1/blobs/${blobId}`;
+      } else {
+        console.error('Upload failed:', res.status, await res.text());
         throw new Error('Upload failed')
       }
-
-      const data = await response.json()
-      return data.url
     } catch (error) {
       console.error('Error uploading to Walrus:', error)
       throw error
@@ -170,7 +143,7 @@ export function CreatePost() {
       setError('Please connect your wallet first')
       return
     }
-
+console.log(currentWallet,'currentWallet')
     if (!title.trim() || !content.trim()) {
       setError('Title and content are required')
       return
@@ -232,7 +205,7 @@ export function CreatePost() {
   }
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
+    <Box sx={{ maxWidth: 1800, mx: 'auto', p: 3 }}>
       <Typography variant="h4" gutterBottom>
         Create New Post
       </Typography>
@@ -306,11 +279,11 @@ export function CreatePost() {
               />
             </Button>
           </Stack>
-          <StyledTextarea
+         <MarkdownEditor
             value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onPaste={handlePaste}
-            placeholder="Write your post content in Markdown..."
+            onChange={setContent}
+            label="Content"
+            onImageUpload={(file) => uploadToWalrus(file)}
           />
         </Box>
 
