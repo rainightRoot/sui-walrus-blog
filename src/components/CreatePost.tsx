@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useWallets, useSignAndExecuteTransaction } from '@mysten/dapp-kit'
+import { useWallets, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -45,6 +45,7 @@ const PreviewPaper = styled(Paper)(({ theme }) => ({
 }))
 
 export function CreatePost() {
+  const account = useCurrentAccount();
   const navigate = useNavigate()
   const wallets = useWallets()
   const { mutate: signAndExecute } = useSignAndExecuteTransaction()
@@ -143,7 +144,12 @@ export function CreatePost() {
       setError('Please connect your wallet first')
       return
     }
-console.log(currentWallet,'currentWallet')
+    
+    if (!account) {
+      setError('No account found')
+      return
+    }
+    
     if (!title.trim() || !content.trim()) {
       setError('Title and content are required')
       return
@@ -158,7 +164,11 @@ console.log(currentWallet,'currentWallet')
         assets.map(async (asset) => {
           try {
             const url = await uploadToWalrus(asset.file)
-            return url
+            return {
+              url,
+              name: asset.file.name,
+              type: asset.file.type
+            }
           } catch (error) {
             console.error('Error uploading asset:', error)
             throw error
@@ -169,29 +179,69 @@ console.log(currentWallet,'currentWallet')
       // 创建交易块
       const tx = new TransactionBlock()
       
+      // 获取 Clock 对象
+      const clockObj = tx.pure('0x6');
+      
+      // 将数据转换为 UTF-8 字节数组格式，适配 Move 中的 vector<u8>
+      const titleBytes = Array.from(new TextEncoder().encode(title));
+      const contentBytes = Array.from(new TextEncoder().encode(content));
+      const contentTypeBytes = Array.from(new TextEncoder().encode('markdown'));
+      const authorBytes = Array.from(new TextEncoder().encode(account.address));
+      
+      // 将标签转换为字节数组的数组
+      const tagsBytes = tags.map(tag => Array.from(new TextEncoder().encode(tag)));
+      
       // 创建帖子对象
-      tx.moveCall({
+      const createPostResult = tx.moveCall({
         target: `${BLOG_PACKAGE_ID}::${BLOG_MODULE}::create_post`,
         arguments: [
-          tx.pure(title),
-          tx.pure(content),
-          tx.pure(tags),
-          tx.pure(uploadedAssets),
-          tx.pure(currentWallet.accounts[0].address),
-          tx.pure(Date.now())
+          tx.pure(titleBytes),
+          tx.pure(contentBytes),
+          tx.pure(contentTypeBytes),
+          tx.pure(authorBytes),
+          tx.pure(tagsBytes),
+          clockObj,
+          // tx.object 不需要传递 ctx 参数，它会由 Sui 自动处理
         ]
-      })
+      });
+
+      // 如果有上传的资源，为每个资源调用 add_asset
+      if (uploadedAssets.length > 0) {
+        // 在同一个交易中，创建的对象需要作为下一个调用的引用
+        const postRef = tx.object(createPostResult);
+        
+        // 为每个资源添加到帖子
+        for (const asset of uploadedAssets) {
+          const hashBytes = Array.from(new TextEncoder().encode(asset.url));
+          const typeBytes = Array.from(new TextEncoder().encode(asset.type));
+          const nameBytes = Array.from(new TextEncoder().encode(asset.name));
+          
+          tx.moveCall({
+            target: `${BLOG_PACKAGE_ID}::${BLOG_MODULE}::add_asset`,
+            arguments: [
+              postRef,
+              tx.pure(hashBytes),
+              tx.pure(typeBytes),
+              tx.pure(nameBytes),
+              clockObj,
+              // tx.object 不需要传递 ctx 参数，它会由 Sui 自动处理
+            ]
+          });
+        }
+      }
 
       // 发布帖子
       await signAndExecute({
         transaction: tx.serialize(),
-        account: currentWallet.accounts[0]
+        account: account,
+        chain: 'sui:testnet'
       })
       
       setSuccess(true)
       localStorage.removeItem('blogPostDraft')
-      setTimeout(() => navigate('/'), 2000)
+      // setTimeout(() => navigate('/'), 2000)
     } catch (err) {
+      console.error('Transaction error:', err)
       setError(err instanceof Error ? err.message : 'Failed to create post')
     } finally {
       setIsSubmitting(false)
