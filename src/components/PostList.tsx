@@ -174,7 +174,7 @@ export function PostList() {
             });
             
             // 获取内容
-            const content = await fetchContent(contentHash);
+            const content = contentHash
             
             return {
               id: eventData.post_id,
@@ -287,7 +287,7 @@ export function PostList() {
       <Grid container spacing={3}>
         {posts.map((post) => (
           <Grid item xs={12} md={6} key={post.id}>
-            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s, box-shadow 0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 } }}>
               <CardContent sx={{ flexGrow: 1 }}>
                 <Typography variant="h5" component="h2" gutterBottom>
                   <Link to={`/post/${post.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
@@ -315,6 +315,16 @@ export function PostList() {
                   </Typography>
                 </Box>
               </CardContent>
+              <Box sx={{ p: 2, pt: 0, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  component={Link}
+                  to={`/post/${post.id}`}
+                  size="small"
+                  color="primary"
+                >
+                  Read More
+                </Button>
+              </Box>
             </Card>
           </Grid>
         ))}

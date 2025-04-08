@@ -17,6 +17,7 @@ import {
 } from '@mui/material'
 import { CreatePost } from './components/CreatePost'
 import { PostList } from './components/PostList'
+import { PostDetail } from './components/PostDetail'
 import { rpc_url, ws_rpc_url } from './constants'
 
 // 创建主题
@@ -144,6 +145,7 @@ function App() {
                   <Routes>
                     <Route path="/" element={<PostList />} />
                     <Route path="/create" element={<CreatePost />} />
+                    <Route path="/post/:id" element={<PostDetail />} />
                   </Routes>
                 </Container>
               </Box>
