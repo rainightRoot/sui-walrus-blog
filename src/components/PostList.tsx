@@ -1,18 +1,27 @@
 import { useState, useEffect } from 'react'
-import { useSuiClient, useWallets } from '@mysten/dapp-kit'
+import { useSuiClient } from '@mysten/dapp-kit'
+import { type EventId } from '@mysten/sui/client'
 import {
   Box,
   Card,
   CardContent,
   Typography,
-  Grid,
   Chip,
   CircularProgress,
   Alert,
-  Button
+  Button,
+  Pagination,
+  Stack,
+  Skeleton,
+  Grid
 } from '@mui/material'
 import { Link } from 'react-router-dom'
-import { BLOG_PACKAGE_ID, BLOG_MODULE, PUBLISHER_URL, AGGREGATOR_URL } from '../constants'
+import { BLOG_PACKAGE_ID, BLOG_MODULE, AGGREGATOR_URL } from '../constants'
+
+// 定义一个工具函数，确保不返回 undefined
+const ensureNotUndefined = <T,>(value: T | null | undefined): T | null => {
+  return value === undefined ? null : value;
+};
 
 interface Post {
   id: string
@@ -29,13 +38,41 @@ interface Post {
   likes: number
 }
 
+interface PostEvent {
+  post_id: string
+  title: number[]
+  author: number[]
+}
+
+// 定义部分字段，不需要完全匹配
+interface BlogPostFields {
+  title?: number[]
+  content_hash?: number[]
+  tags?: number[][]
+  author?: number[]
+  created_at?: string
+  likes?: string
+  [key: string]: unknown // 使用 unknown 而不是 any
+}
+
 export function PostList() {
   const suiClient = useSuiClient()
-  const wallets = useWallets()
-  const currentWallet = wallets[0]
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // 分页相关状态
+  const [page, setPage] = useState(1)
+  const [totalPosts, setTotalPosts] = useState(0)
+  const [hasNextCursor, setHasNextCursor] = useState<EventId | null>(null)
+  const [cursors, setCursors] = useState<Record<number, EventId | null>>({}) // 保存每页的游标
+  const postsPerPage = 6 // 每页显示的帖子数量
+
+  // 页面变化处理函数
+  const handlePageChange = (_event: React.ChangeEvent<unknown>, newPage: number) => {
+    setPage(newPage);
+    fetchPosts(cursors[newPage - 1]);
+  };
 
   useEffect(() => {
     fetchPosts()
@@ -72,113 +109,75 @@ export function PostList() {
     return new TextDecoder().decode(new Uint8Array(bytes));
   }
 
-  const fetchPosts = async () => {
+  const fetchPosts = async (cursor?: EventId | null) => {
     try {
       setLoading(true);
       setError(null);
       
-      // 方法1: 查询所有 BlogPost 对象
-      console.log("开始查询博客对象...");
-      const blogTypeArg = `${BLOG_PACKAGE_ID}::${BLOG_MODULE}::BlogPost`;
-      const objectsResponse = await suiClient.getOwnedObjects({
-        owner: currentWallet?.accounts[0]?.address || '',
-        options: {
-          showContent: true,
-          showType: true,
+      // 查询 PostCreated 事件
+      console.log("查询 PostCreated 事件...");
+      const eventsResponse = await suiClient.queryEvents({
+        query: {
+          MoveEventType: `${BLOG_PACKAGE_ID}::${BLOG_MODULE}::PostCreated`
         },
-        filter: {
-          StructType: blogTypeArg
-        }
+        cursor,
+        limit: postsPerPage,
+        order: 'descending' // 按时间降序排列
       });
       
-      console.log("查询结果:", objectsResponse);
+      console.log("事件查询结果:", eventsResponse);
       
-      if (objectsResponse.data.length === 0) {
-        console.log("未找到任何博客对象, 尝试查询事件...");
-        
-        // 方法2: 查询 PostCreated 事件
-        const eventsResponse = await suiClient.queryEvents({
-          query: {
-            MoveEventType: `${BLOG_PACKAGE_ID}::${BLOG_MODULE}::PostCreated`
-          },
-          limit: 50
+      // 保存下一页的游标
+      if (eventsResponse.hasNextPage && eventsResponse.nextCursor) {
+        const nextCursor = ensureNotUndefined(eventsResponse.nextCursor);
+        setHasNextCursor(nextCursor);
+        setCursors(prev => {
+          const newCursors = { ...prev };
+          newCursors[page] = nextCursor;
+          return newCursors;
         });
-        
-        console.log("事件查询结果:", eventsResponse);
-        
-        const postPromises = eventsResponse.data.map(async (event) => {
-          const eventData = event.parsedJson as any;
-          
-          // 获取指向的对象
-          try {
-            const objectData = await suiClient.getObject({
-              id: eventData.post_id,
-              options: {
-                showContent: true,
-                showType: true,
-              }
-            });
-            
-            console.log("获取到的对象数据:", objectData);
-            
-            if (objectData.data?.content && objectData.data.content.dataType === 'moveObject') {
-              const fields = objectData.data.content.fields as any;
-              const title = bytesToString(fields.title || []);
-              const contentHash = bytesToString(fields.content_hash || []);
-              const tags = (fields.tags || []).map((tag: number[]) => bytesToString(tag));
-              const author = bytesToString(fields.author || []);
-              
-              console.log("解析的帖子数据:", {
-                title,
-                contentHash,
-                tags,
-                author
-              });
-              
-              // 获取内容
-              const content = await fetchContent(contentHash);
-              
-              return {
-                id: eventData.post_id,
-                title,
-                content,
-                tags,
-                assets: [],  // 暂时为空
-                createdAt: Number(fields.created_at || 0),
-                author,
-                likes: Number(fields.likes || 0)
-              };
-            }
-          } catch (err) {
-            console.error(`获取对象 ${eventData.post_id} 失败:`, err);
-          }
-          
-          return null;
-        });
-        
-        const postsResults = await Promise.all(postPromises);
-        const validPosts = postsResults.filter(post => post !== null) as Post[];
-        
-        console.log("解析完成的帖子:", validPosts);
-        
-        // 按创建时间降序排序
-        validPosts.sort((a, b) => b.createdAt - a.createdAt);
-        setPosts(validPosts);
       } else {
-        // 处理找到的博客对象
-        const postPromises = objectsResponse.data.map(async (obj) => {
-          if (obj.data?.content && obj.data.content.dataType === 'moveObject') {
-            const fields = obj.data.content.fields as any;
+        setHasNextCursor(null);
+      }
+      
+      // 处理获取到的事件
+      const postPromises = eventsResponse.data.map(async (event) => {
+        const eventData = event.parsedJson as PostEvent;
+        
+        // 获取指向的对象
+        try {
+          const objectData = await suiClient.getObject({
+            id: eventData.post_id,
+            options: {
+              showContent: true,
+              showType: true,
+            }
+          });
+          
+          console.log("获取到的对象数据:", objectData);
+          
+          if (objectData.data?.content && objectData.data.content.dataType === 'moveObject') {
+            // 使用中间类型
+            const rawFields = objectData.data.content.fields as unknown;
+            const fields = rawFields as BlogPostFields;
+            
             const title = bytesToString(fields.title || []);
             const contentHash = bytesToString(fields.content_hash || []);
             const tags = (fields.tags || []).map((tag: number[]) => bytesToString(tag));
             const author = bytesToString(fields.author || []);
             
+            console.log("解析的帖子数据:", {
+              title,
+              contentHash,
+              tags,
+              author
+            });
+            
             // 获取内容
             const content = await fetchContent(contentHash);
             
             return {
-              id: obj.data.objectId,
+              id: eventData.post_id,
               title,
               content,
               tags,
@@ -188,16 +187,28 @@ export function PostList() {
               likes: Number(fields.likes || 0)
             };
           }
-          return null;
-        });
+        } catch (err) {
+          console.error(`获取对象 ${eventData.post_id} 失败:`, err);
+        }
         
-        const postsResults = await Promise.all(postPromises);
-        const validPosts = postsResults.filter(post => post !== null) as Post[];
-        
-        // 按创建时间降序排序
-        validPosts.sort((a, b) => b.createdAt - a.createdAt);
-        setPosts(validPosts);
+        return null;
+      });
+      
+      // 等待所有查询完成
+      const postsResults = await Promise.all(postPromises);
+      const validPosts = postsResults.filter(post => post !== null) as Post[];
+      
+      console.log("解析完成的帖子:", validPosts);
+      
+      // 估算总帖子数量
+      if (cursor === undefined || cursor === null) {
+        // 这只是一个粗略的估计，以后可能需要更精确的计算
+        setTotalPosts(eventsResponse.hasNextPage ? (page * postsPerPage) + postsPerPage : validPosts.length);
       }
+      
+      // 按创建时间降序排序
+      validPosts.sort((a, b) => b.createdAt - a.createdAt);
+      setPosts(validPosts);
     } catch (error) {
       console.error('Error fetching posts:', error);
       setError('Failed to fetch posts. Please try again later.');
@@ -206,26 +217,50 @@ export function PostList() {
     }
   };
 
-  if (loading) {
+  // 渲染加载状态的骨架屏
+  const renderSkeletons = () => {
+    return Array(postsPerPage).fill(0).map((_, index) => (
+      <Grid item xs={12} md={6} key={`skeleton-${index}`}>
+        <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <CardContent sx={{ flexGrow: 1 }}>
+            <Skeleton variant="text" height={40} width="80%" />
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 2, mt: 1 }}>
+              <Skeleton variant="rectangular" width={60} height={24} sx={{ borderRadius: 1, mr: 1 }} />
+              <Skeleton variant="rectangular" width={80} height={24} sx={{ borderRadius: 1 }} />
+            </Box>
+            <Skeleton variant="rectangular" height={80} />
+            <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', pt: 2 }}>
+              <Skeleton variant="text" width={100} />
+              <Skeleton variant="text" width={120} />
+            </Box>
+          </CardContent>
+        </Card>
+      </Grid>
+    ));
+  };
+
+  if (loading && posts.length === 0) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-        <CircularProgress />
+      <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
+        <Grid container spacing={3}>
+          {renderSkeletons()}
+        </Grid>
       </Box>
-    )
+    );
   }
 
-  if (error) {
+  if (error && posts.length === 0) {
     return (
       <Box sx={{ p: 2 }}>
         <Alert severity="error">{error}</Alert>
-        <Button sx={{ mt: 2 }} variant="contained" onClick={fetchPosts}>
+        <Button sx={{ mt: 2 }} variant="contained" onClick={() => fetchPosts()}>
           Retry
         </Button>
       </Box>
     )
   }
 
-  if (posts.length === 0) {
+  if (posts.length === 0 && !loading) {
     return (
       <Box sx={{ p: 2, textAlign: 'center' }}>
         <Alert severity="info">No blog posts found. Create your first post!</Alert>
@@ -243,6 +278,12 @@ export function PostList() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: 2 }}>
+      {loading && (
+        <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <CircularProgress size={24} />
+        </Box>
+      )}
+      
       <Grid container spacing={3}>
         {posts.map((post) => (
           <Grid item xs={12} md={6} key={post.id}>
@@ -278,6 +319,19 @@ export function PostList() {
           </Grid>
         ))}
       </Grid>
+      
+      {/* 分页控件 */}
+      {(hasNextCursor || page > 1) && (
+        <Stack spacing={2} sx={{ mt: 4, display: 'flex', alignItems: 'center' }}>
+          <Pagination 
+            count={Math.ceil(totalPosts / postsPerPage)} 
+            page={page} 
+            onChange={handlePageChange} 
+            color="primary"
+            disabled={loading}
+          />
+        </Stack>
+      )}
     </Box>
   )
 } 
