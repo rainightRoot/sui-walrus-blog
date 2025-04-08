@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useWallets, useCurrentAccount, useSignAndExecuteTransaction, ConnectButton } from '@mysten/dapp-kit'
 import { useNavigate } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
 import {
   Box,
   TextField,
@@ -239,7 +240,7 @@ export function CreatePost() {
       
       setSuccess(true)
       localStorage.removeItem('blogPostDraft')
-      // setTimeout(() => navigate('/'), 2000)
+      setTimeout(() => navigate('/'), 2000)
     } catch (err) {
       console.error('Transaction error:', err)
       setError(err instanceof Error ? err.message : 'Failed to create post')
@@ -440,8 +441,66 @@ export function CreatePost() {
             <Typography variant="subtitle1" color="text.secondary" gutterBottom>
               {tags.join(', ')}
             </Typography>
-            <Box sx={{ mt: 2 }}>
-              {previewContent}
+            <Box sx={{ 
+              mt: 2,
+              '& img': { 
+                maxWidth: '100%', 
+                height: 'auto',
+                borderRadius: 1,
+                my: 2
+              },
+              '& a': {
+                color: 'primary.main',
+                textDecoration: 'none',
+                '&:hover': {
+                  textDecoration: 'underline'
+                }
+              },
+              '& h1, & h2, & h3, & h4, & h5, & h6': {
+                mt: 3,
+                mb: 2
+              },
+              '& code': {
+                px: 1,
+                py: 0.5,
+                borderRadius: 1,
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                fontFamily: 'monospace'
+              },
+              '& pre': {
+                p: 2,
+                borderRadius: 1,
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                overflowX: 'auto',
+                '& code': {
+                  backgroundColor: 'transparent'
+                }
+              },
+              '& table': {
+                borderCollapse: 'collapse',
+                width: '100%',
+                my: 3,
+                border: '1px solid rgba(224, 224, 224, 1)'
+              },
+              '& th': {
+                border: '1px solid rgba(224, 224, 224, 1)',
+                padding: '12px',
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                textAlign: 'left',
+                fontWeight: 'bold'
+              },
+              '& td': {
+                border: '1px solid rgba(224, 224, 224, 1)',
+                padding: '12px',
+                textAlign: 'left'
+              },
+              '& tr:nth-of-type(even)': {
+                backgroundColor: 'rgba(0, 0, 0, 0.02)'
+              }
+            }}>
+              <ReactMarkdown>
+                {previewContent}
+              </ReactMarkdown>
             </Box>
           </PreviewPaper>
         </DialogContent>
