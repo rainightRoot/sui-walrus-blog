@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useWallets, useCurrentAccount, useSignAndExecuteTransaction } from '@mysten/dapp-kit'
+import { useWallets, useCurrentAccount, useSignAndExecuteTransaction, ConnectButton } from '@mysten/dapp-kit'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
@@ -255,159 +255,175 @@ export function CreatePost() {
   }
 
   return (
-    <Box sx={{ maxWidth: 1800, mx: 'auto', p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Create New Post
-      </Typography>
-
-      <StyledPaper>
-        <TextField
-          fullWidth
-          label="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          margin="normal"
-          required
-        />
-
-        <Box sx={{ mt: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="subtitle1">Tags:</Typography>
-            {tags.map((tag, index) => (
-              <Chip
-                key={index}
-                label={tag}
-                onDelete={() => setTags(tags.filter((_, i) => i !== index))}
-                color="primary"
-                variant="outlined"
-              />
-            ))}
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              <TextField
-                size="small"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                placeholder="Add tag"
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && newTag.trim()) {
-                    setTags([...tags, newTag.trim()])
-                    setNewTag('')
-                  }
-                }}
-              />
-              <IconButton
-                color="primary"
-                onClick={() => {
-                  if (newTag.trim()) {
-                    setTags([...tags, newTag.trim()])
-                    setNewTag('')
-                  }
-                }}
-              >
-                <AddIcon />
-              </IconButton>
-            </Box>
-          </Stack>
+    <Box sx={{ maxWidth: 1200, mx: 'auto', p: 3 }}>
+      {!account ? (
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          alignItems: 'center', 
+          justifyContent: 'center', 
+          minHeight: '60vh',
+          gap: 2
+        }}>
+          <Typography variant="h5" gutterBottom>
+            Connect Your Wallet to Create Post
+          </Typography>
+          <ConnectButton />
         </Box>
-
-        <Box sx={{ mt: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-            <Typography variant="subtitle1">Content:</Typography>
-            <Button
-              variant="outlined"
-              startIcon={<ImageIcon />}
-              component="label"
-              size="small"
-            >
-              Upload Image
-              <input
-                type="file"
-                hidden
-                accept="image/*"
-                multiple
-                onChange={handleImageUpload}
-              />
-            </Button>
-          </Stack>
-         <MarkdownEditor
-            value={content}
-            onChange={setContent}
-            label="Content"
-            onImageUpload={(file) => uploadToWalrus(file)}
-          />
-        </Box>
-
-        {assets.length > 0 && (
-          <Box sx={{ mt: 2 }}>
-            <Typography variant="subtitle1" gutterBottom>
-              Uploaded Images:
-            </Typography>
-            <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-              {assets.map((asset, index) => (
-                <Box
-                  key={index}
-                  sx={{
-                    position: 'relative',
-                    width: 150,
-                    height: 150,
-                    borderRadius: 1,
-                    overflow: 'hidden',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                  }}
-                >
-                  <img
-                    src={asset.preview}
-                    alt={`Preview ${index + 1}`}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
+      ) : (
+        <>
+          <Typography variant="h4" gutterBottom>
+            Create New Post
+          </Typography>
+          <StyledPaper>
+            <TextField
+              fullWidth
+              label="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              sx={{ mb: 2 }}
+            />
+           
+            <Box sx={{ mt: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                <Typography variant="subtitle1">Tags:</Typography>
+                {tags.map((tag, index) => (
+                  <Chip
+                    key={index}
+                    label={tag}
+                    onDelete={() => setTags(tags.filter((_, i) => i !== index))}
+                    color="primary"
+                    variant="outlined"
+                  />
+                ))}
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <TextField
+                    size="small"
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    placeholder="Add tag"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && newTag.trim()) {
+                        setTags([...tags, newTag.trim()])
+                        setNewTag('')
+                      }
                     }}
                   />
                   <IconButton
-                    size="small"
-                    sx={{
-                      position: 'absolute',
-                      top: 4,
-                      right: 4,
-                      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    color="primary"
+                    onClick={() => {
+                      if (newTag.trim()) {
+                        setTags([...tags, newTag.trim()])
+                        setNewTag('')
+                      }
                     }}
-                    onClick={() => handleDeleteAsset(index)}
                   >
-                    <DeleteIcon />
+                    <AddIcon />
                   </IconButton>
                 </Box>
-              ))}
-            </Stack>
-          </Box>
-        )}
+              </Stack>
+            </Box>
 
-        <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
-          <Button
-            variant="contained"
-            onClick={handleSubmit}
-            disabled={isSubmitting || !currentWallet}
-          >
-            {isSubmitting ? <CircularProgress size={24} /> : 'Publish'}
-          </Button>
-          <Button variant="outlined" onClick={handlePreview}>
-            Preview
-          </Button>
-        </Box>
+            <Box sx={{ mt: 2 }}>
+              <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+                <Typography variant="subtitle1">Content:</Typography>
+                <Button
+                  variant="outlined"
+                  startIcon={<ImageIcon />}
+                  component="label"
+                  size="small"
+                >
+                  Upload Image
+                  <input
+                    type="file"
+                    hidden
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                  />
+                </Button>
+              </Stack>
+             <MarkdownEditor
+                value={content}
+                onChange={setContent}
+                label="Content"
+                onImageUpload={(file) => uploadToWalrus(file)}
+              />
+            </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
-          </Alert>
-        )}
+            {assets.length > 0 && (
+              <Box sx={{ mt: 2 }}>
+                <Typography variant="subtitle1" gutterBottom>
+                  Uploaded Images:
+                </Typography>
+                <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
+                  {assets.map((asset, index) => (
+                    <Box
+                      key={index}
+                      sx={{
+                        position: 'relative',
+                        width: 150,
+                        height: 150,
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    >
+                      <img
+                        src={asset.preview}
+                        alt={`Preview ${index + 1}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover',
+                        }}
+                      />
+                      <IconButton
+                        size="small"
+                        sx={{
+                          position: 'absolute',
+                          top: 4,
+                          right: 4,
+                          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                        }}
+                        onClick={() => handleDeleteAsset(index)}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            )}
 
-        {success && (
-          <Alert severity="success" sx={{ mt: 2 }}>
-            Post published successfully! Redirecting...
-          </Alert>
-        )}
-      </StyledPaper>
+            <Box sx={{ mt: 3, display: 'flex', gap: 2 }}>
+              <Button
+                variant="contained"
+                onClick={handleSubmit}
+                disabled={isSubmitting || !currentWallet}
+              >
+                {isSubmitting ? <CircularProgress size={24} /> : 'Publish'}
+              </Button>
+              <Button variant="outlined" onClick={handlePreview}>
+                Preview
+              </Button>
+            </Box>
+
+            {error && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {error}
+              </Alert>
+            )}
+
+            {success && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                Post published successfully! Redirecting...
+              </Alert>
+            )}
+          </StyledPaper>
+        </>
+      )}
 
       <Dialog
         open={isPreviewOpen}
