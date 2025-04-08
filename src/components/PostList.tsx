@@ -13,10 +13,13 @@ import {
   Pagination,
   Stack,
   Skeleton,
-  Grid
+  Grid as MuiGrid
 } from '@mui/material'
 import { Link } from 'react-router-dom'
-import { BLOG_PACKAGE_ID, BLOG_MODULE, AGGREGATOR_URL } from '../constants'
+import { BLOG_PACKAGE_ID, BLOG_MODULE } from '../constants'
+
+// 创建 Grid 别名以便可以使用 item 属性
+const Grid = MuiGrid;
 
 // 定义一个工具函数，确保不返回 undefined
 const ensureNotUndefined = <T,>(value: T | null | undefined): T | null => {
@@ -79,30 +82,30 @@ export function PostList() {
   }, [])
 
   // 从 Walrus 获取内容
-  const fetchContent = async (contentHash: string): Promise<string> => {
-    try {
-      if (!contentHash) return "No content available";
+  // const fetchContent = async (contentHash: string): Promise<string> => {
+  //   try {
+  //     if (!contentHash) return "No content available";
       
-      // 确认内容哈希是否为 URL
-      if (contentHash.startsWith('http')) {
-        const response = await fetch(contentHash);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch content: ${response.statusText}`);
-        }
-        return await response.text();
-      }
+  //     // 确认内容哈希是否为 URL
+  //     if (contentHash.startsWith('http')) {
+  //       const response = await fetch(contentHash);
+  //       if (!response.ok) {
+  //         throw new Error(`Failed to fetch content: ${response.statusText}`);
+  //       }
+  //       return await response.text();
+  //     }
       
-      // 否则，尝试从 Walrus 聚合器获取
-      const response = await fetch(`${AGGREGATOR_URL}/v1/blobs/${contentHash}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch content from Walrus: ${response.statusText}`);
-      }
-      return await response.text();
-    } catch (error) {
-      console.error('Error fetching content:', error);
-      return 'Failed to load content';
-    }
-  }
+  //     // 否则，尝试从 Walrus 聚合器获取
+  //     const response = await fetch(`${AGGREGATOR_URL}/v1/blobs/${contentHash}`);
+  //     if (!response.ok) {
+  //       throw new Error(`Failed to fetch content from Walrus: ${response.statusText}`);
+  //     }
+  //     return await response.text();
+  //   } catch (error) {
+  //     console.error('Error fetching content:', error);
+  //     return 'Failed to load content';
+  //   }
+  // }
 
   // 将字节数组转换为字符串
   const bytesToString = (bytes: number[]): string => {
@@ -219,8 +222,7 @@ export function PostList() {
 
   // 渲染加载状态的骨架屏
   const renderSkeletons = () => {
-    return Array(postsPerPage).fill(0).map((_, index) => (
-      <Grid item xs={12} md={6} key={`skeleton-${index}`}>
+    return Array(postsPerPage).fill(0).map(() => (
         <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <CardContent sx={{ flexGrow: 1 }}>
             <Skeleton variant="text" height={40} width="80%" />
@@ -235,7 +237,6 @@ export function PostList() {
             </Box>
           </CardContent>
         </Card>
-      </Grid>
     ));
   };
 
@@ -286,7 +287,7 @@ export function PostList() {
       
       <Grid container spacing={3}>
         {posts.map((post) => (
-          <Grid item xs={12} md={6} key={post.id}>
+          <Grid container spacing={3} key={post.id}>
             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.2s, box-shadow 0.2s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 4 } }}>
               <CardContent sx={{ flexGrow: 1 }}>
                 <Typography variant="h5" component="h2" gutterBottom>

@@ -1,8 +1,6 @@
 import { useState, useRef } from 'react'
 import { Box, Paper, TextField, Typography, IconButton, Tooltip } from '@mui/material'
 import ReactMarkdown from 'react-markdown'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import {
   FormatBold,
   FormatItalic,
@@ -27,12 +25,7 @@ interface MarkdownEditorProps {
   onImageUpload?: (file: File) => Promise<string>
 }
 
-interface CodeProps {
-  inline?: boolean
-  className?: string
-  children?: React.ReactNode
-  [key: string]: unknown
-}
+
 
 export function MarkdownEditor({ 
   value, 
@@ -162,23 +155,7 @@ export function MarkdownEditor({
         <Paper sx={{ p: 2, minHeight: 400 }}>
           <ReactMarkdown
             components={{
-              code({ inline, className, children, ...props }: CodeProps) {
-                const match = /language-(\w+)/.exec(className || '')
-                return !inline && match ? (
-                  <SyntaxHighlighter
-                    style={vscDarkPlus}
-                    language={match[1]}
-                    PreTag="div"
-                    {...props}
-                  >
-                    {String(children || '').replace(/\n$/, '')}
-                  </SyntaxHighlighter>
-                ) : (
-                  <code className={className} {...props}>
-                    {children}
-                  </code>
-                )
-              },
+              
               table({ children }) {
                 return (
                   <table style={{ borderCollapse: 'collapse', width: '100%', margin: '1em 0' }}>

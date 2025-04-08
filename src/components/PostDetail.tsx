@@ -23,7 +23,7 @@ import {
 } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import ReactMarkdown from 'react-markdown';
-import { BLOG_PACKAGE_ID, BLOG_MODULE, AGGREGATOR_URL } from '../constants';
+import { BLOG_PACKAGE_ID, BLOG_MODULE } from '../constants';
 
 // 样式组件
 const StyledPaper = styled(Paper)(({ theme }) => ({
@@ -109,30 +109,30 @@ export function PostDetail() {
   };
 
   // 从 Walrus 获取内容
-  const fetchContent = async (contentHash: string): Promise<string> => {
-    try {
-      if (!contentHash) return "No content available";
+  // const fetchContent = async (contentHash: string): Promise<string> => {
+  //   try {
+  //     if (!contentHash) return "No content available";
       
-      // 确认内容哈希是否为 URL
-      if (contentHash.startsWith('http')) {
-        const response = await fetch(contentHash);
-        if (!response.ok) {
-          throw new Error(`Failed to fetch content: ${response.statusText}`);
-        }
-        return await response.text();
-      }
+  //     // 确认内容哈希是否为 URL
+  //     if (contentHash.startsWith('http')) {
+  //       const response = await fetch(contentHash);
+  //       if (!response.ok) {
+  //         throw new Error(`Failed to fetch content: ${response.statusText}`);
+  //       }
+  //       return await response.text();
+  //     }
       
-      // 从 Walrus 聚合器获取
-      const response = await fetch(`${AGGREGATOR_URL}/v1/blobs/${contentHash}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch content from Walrus: ${response.statusText}`);
-      }
-      return await response.text();
-    } catch (error) {
-      console.error('Error fetching content:', error);
-      return 'Failed to load content';
-    }
-  };
+  //     // 从 Walrus 聚合器获取
+  //     const response = await fetch(`${AGGREGATOR_URL}/v1/blobs/${contentHash}`);
+  //     if (!response.ok) {
+  //       throw new Error(`Failed to fetch content from Walrus: ${response.statusText}`);
+  //     }
+  //     return await response.text();
+  //   } catch (error) {
+  //     console.error('Error fetching content:', error);
+  //     return 'Failed to load content';
+  //   }
+  // };
 
   // 获取帖子详情
   const fetchPostDetail = async () => {
