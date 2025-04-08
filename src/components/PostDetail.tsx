@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useSuiClient, useCurrentAccount } from '@mysten/dapp-kit';
+import { useSignAndExecuteTransaction, useCurrentAccount,useSuiClient } from '@mysten/dapp-kit';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
 import {
   Box,
@@ -70,6 +70,12 @@ interface Post {
   }>;
 }
 
+interface CommentFields {
+  author: number[];
+  content: number[];
+  created_at: number;
+}
+
 interface BlogPostFields {
   title?: number[];
   content_hash?: number[];
@@ -77,13 +83,15 @@ interface BlogPostFields {
   author?: number[];
   created_at?: string;
   likes?: string;
-  comments?: Record<string, unknown>[];
+  comments?: Array<{ fields: CommentFields }>;
   [key: string]: unknown;
 }
 
 export function PostDetail() {
   const { id } = useParams<{ id: string }>();
+  const { mutate: signAndExecute } = useSignAndExecuteTransaction();
   const suiClient = useSuiClient();
+
   const account = useCurrentAccount();
   const navigate = useNavigate();
   
@@ -161,13 +169,12 @@ export function PostDetail() {
         
         // 获取内容
         const content = contentHash
-        
         // 处理评论
-        const comments = (fields.comments || []).map((comment: Record<string, unknown>) => {
+        const comments = (fields.comments || []).map((comment: { fields: CommentFields }) => {
           return {
-            author: bytesToString(comment.author as number[] || []),
-            content: bytesToString(comment.content as number[] || []),
-            createdAt: Number(comment.created_at || 0),
+            author: bytesToString(comment.fields.author || []),
+            content: bytesToString(comment.fields.content || []),
+            createdAt: Number(comment.fields.created_at || 0),
           };
         });
         
@@ -183,7 +190,6 @@ export function PostDetail() {
           likes: Number(fields.likes || 0),
           comments,
         };
-        
         setPost(postData);
         
         // 查询帖子的资产列表
@@ -239,12 +245,10 @@ export function PostDetail() {
       });
       
       // 执行交易
-      const response = await suiClient.signAndExecuteTransactionBlock({
-        signer: account,
-        transactionBlock: tx,
-        options: {
-          showEffects: true,
-        }
+      const response = await signAndExecute({
+        transaction: tx.serialize(),
+        account: account,
+        chain: 'sui:testnet'
       });
       
       console.log('Comment submitted:', response);
@@ -281,12 +285,10 @@ export function PostDetail() {
       });
       
       // 执行交易
-      const response = await suiClient.signAndExecuteTransactionBlock({
-        signer: account,
-        transactionBlock: tx,
-        options: {
-          showEffects: true,
-        }
+      const response = await signAndExecute({
+        transaction: tx.serialize(),
+        account: account,
+        chain: 'sui:testnet'
       });
       
       console.log('Post liked:', response);
@@ -560,7 +562,7 @@ export function PostDetail() {
               </Box>
               
               <Typography variant="body2" sx={{ ml: 5 }}>
-                {comment.content}
+                {comment.content || 'No content'}
               </Typography>
             </CommentItem>
           ))
