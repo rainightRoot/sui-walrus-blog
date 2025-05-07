@@ -1,8 +1,26 @@
 module sui_walrus_blog::blog {
     use sui::event;
+    use sui::object::{Self, UID};
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
     use sui::clock::{Self, Clock};
+    use std::vector;
+
+    #[allow(unused_const)]
+    const EInvalidTitle: u64 = 0;
+    #[allow(unused_const)]
+    const EInvalidContent: u64 = 1;
+    #[allow(unused_const)]
+    const EAssetNotFound: u64 = 2;
+    #[allow(unused_const)]
+    const EAssetExpired: u64 = 3;
+    #[allow(unused_const)]
+    const ENotAuthorized: u64 = 4;
+
+    const DEFAULT_ASSET_VALIDITY: u64 = 90 * 24 * 60 * 60 * 1000;
+
     public struct BlogPost has key {
-        id: object::UID,
+        id: UID,
         title: vector<u8>,
         content_hash: vector<u8>,
         content_type: vector<u8>,
@@ -20,6 +38,7 @@ module sui_walrus_blog::blog {
         asset_type: vector<u8>,
         name: vector<u8>,
         created_at: u64,
+        expires_at: u64,
     }
 
     public struct Comment has store, copy, drop {
@@ -27,9 +46,6 @@ module sui_walrus_blog::blog {
         content: vector<u8>,
         created_at: u64,
     }
-
-    const EInvalidTitle: u64 = 0;
-    const EInvalidContent: u64 = 1;
 
     public struct PostCreated has copy, drop {
         post_id: object::ID,
@@ -53,6 +69,34 @@ module sui_walrus_blog::blog {
         asset_type: vector<u8>,
     }
 
+    public struct AssetRenewed has copy, drop {
+        post_id: object::ID,
+        asset_name: vector<u8>,
+        new_expires_at: u64,
+    }
+
+    // 自定义向量相等性比较函数
+    fun bytes_equal(a: &vector<u8>, b: &vector<u8>): bool {
+        let len_a = vector::length(a);
+        let len_b = vector::length(b);
+        
+        if (len_a != len_b) {
+            return false
+        };
+        
+        let mut i = 0;
+        while (i < len_a) {
+            let byte_a = *vector::borrow(a, i);
+            let byte_b = *vector::borrow(b, i);
+            if (byte_a != byte_b) {
+                return false
+            };
+            i = i + 1;
+        };
+        
+        true
+    }
+
     public entry fun create_post(
         title: vector<u8>,
         content_hash: vector<u8>,
@@ -67,10 +111,10 @@ module sui_walrus_blog::blog {
 
         let post = BlogPost {
             id: object::new(ctx),
-            title: copy(title),
+            title: copy title,
             content_hash,
             content_type,
-            author: copy(author),
+            author: copy author,
             created_at: clock::timestamp_ms(clock),
             updated_at: clock::timestamp_ms(clock),
             tags,
@@ -80,7 +124,7 @@ module sui_walrus_blog::blog {
         };
 
         let post_id = object::id(&post);
-        event::emit<PostCreated>(PostCreated { post_id, title, author });
+        event::emit(PostCreated { post_id, title, author });
         transfer::transfer(post, tx_context::sender(ctx));
     }
 
@@ -92,19 +136,80 @@ module sui_walrus_blog::blog {
         clock: &Clock,
         _ctx: &mut TxContext
     ) {
+        let now = clock::timestamp_ms(clock);
         let asset = Asset {
             hash,
-            asset_type: copy(asset_type),
-            name: copy(name),
-            created_at: clock::timestamp_ms(clock),
+            asset_type: copy asset_type,
+            name: copy name,
+            created_at: now,
+            expires_at: now + DEFAULT_ASSET_VALIDITY,
         };
 
         vector::push_back(&mut post.assets, asset);
-        event::emit<AssetAdded>(AssetAdded {
+        event::emit(AssetAdded {
             post_id: object::id(post),
             asset_name: name,
             asset_type,
         });
+    }
+
+    public entry fun renew_asset(
+        post: &mut BlogPost,
+        asset_name: vector<u8>,
+        author: vector<u8>,
+        extension_days: u64,
+        clock: &Clock,
+        _ctx: &mut TxContext
+    ) {
+        assert!(bytes_equal(&post.author, &author), ENotAuthorized);
+        
+        let now = clock::timestamp_ms(clock);
+        let (found, index) = find_asset_by_name(post, &asset_name);
+        
+        assert!(found, EAssetNotFound);
+        
+        // 获取post_id在修改之前
+        let post_id = object::id(post);
+        
+        // 获取资产并更新过期时间
+        let asset = vector::borrow_mut(&mut post.assets, index);
+        let extension_ms = extension_days * 24 * 60 * 60 * 1000;
+        
+        if (asset.expires_at < now) {
+            asset.expires_at = now + extension_ms;
+        } else {
+            asset.expires_at = asset.expires_at + extension_ms;
+        };
+        
+        // 保存新的过期时间以在事件中使用
+        let new_expires_at = asset.expires_at;
+        
+        // 使用前面保存的值发出事件，而不是再次访问post
+        event::emit(AssetRenewed {
+            post_id,
+            asset_name,
+            new_expires_at,
+        });
+    }
+
+    fun find_asset_by_name(post: &BlogPost, name: &vector<u8>): (bool, u64) {
+        let mut i = 0;
+        let len = vector::length(&post.assets);
+        
+        while (i < len) {
+            let asset = vector::borrow(&post.assets, i);
+            if (bytes_equal(&asset.name, name)) {
+                return (true, i)
+            };
+            i = i + 1;
+        };
+        
+        (false, 0)
+    }
+
+    public fun is_asset_valid(asset: &Asset, clock: &Clock): bool {
+        let now = clock::timestamp_ms(clock);
+        asset.expires_at > now
     }
 
     public entry fun update_post(
@@ -118,12 +223,12 @@ module sui_walrus_blog::blog {
         assert!(vector::length(&new_title) > 0, EInvalidTitle);
         assert!(vector::length(&new_content_hash) > 0, EInvalidContent);
 
-        post.title = copy(new_title);
+        post.title = copy new_title;
         post.content_hash = new_content_hash;
         post.content_type = new_content_type;
         post.updated_at = clock::timestamp_ms(clock);
 
-        event::emit<PostUpdated>(PostUpdated {
+        event::emit(PostUpdated {
             post_id: object::id(post),
             title: new_title,
         });
@@ -137,13 +242,13 @@ module sui_walrus_blog::blog {
         _ctx: &mut TxContext
     ) {
         let comment = Comment {
-            author: copy(author),
+            author: copy author,
             content,
             created_at: clock::timestamp_ms(clock),
         };
 
         vector::push_back(&mut post.comments, comment);
-        event::emit<CommentAdded>(CommentAdded {
+        event::emit(CommentAdded {
             post_id: object::id(post),
             author,
         });
@@ -166,6 +271,18 @@ module sui_walrus_blog::blog {
             post.updated_at,
             post.tags,
             post.likes
+        )
+    }
+
+    public fun get_asset_details(asset: &Asset): (
+        vector<u8>, vector<u8>, vector<u8>, u64, u64
+    ) {
+        (
+            asset.hash,
+            asset.asset_type,
+            asset.name,
+            asset.created_at,
+            asset.expires_at
         )
     }
 }

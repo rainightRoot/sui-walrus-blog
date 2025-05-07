@@ -1,5 +1,5 @@
 // Sui 合约配置
-export const BLOG_PACKAGE_ID = '0x4a38581778ca24696476d84e0960ba8b5d2c709ac3b1ab9570b6699b9ad3bd50' // 临时包 ID，需要替换为实际部署后的包 ID
+export const BLOG_PACKAGE_ID = '0xcc5a7ee6bc86556277b28b7f9102bb896efcb34aef510cab57fd8aa8140c820f' // 临时包 ID，需要替换为实际部署后的包 ID
 export const BLOG_MODULE = 'blog'
 export const BLOG_POST_TYPE = `${BLOG_PACKAGE_ID}::${BLOG_MODULE}::Post`
 
